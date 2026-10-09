@@ -32,19 +32,30 @@ TOC_LEVELS = (2, 3)  # 目录收录的标题层级
 # ---------------------------------------------------------------- 行内
 def inline(s, stash):
     s = re.sub(r"<br\s*/?>", "\x03", s, flags=re.I)          # 允许表格里写 <br>
-    s = html.escape(s, quote=False)
     s = re.sub(r"`([^`]+)`", lambda m: _keep(m.group(1), stash), s)
     s = re.sub(r"\\([\\`*_{}\[\]()#+\-.!~>|])", lambda m: _hold(m.group(1), stash), s)
-    s = s.replace("\x03", "<br>")
-    # markdown 链接 / 图片（图片降级成链接，保证输出自包含）
+    # 链接必须在 html.escape **之前**抠出来，否则三个 bug 一起发作：
+    #   ① & 先变成 &amp;，而自动链接的终止符集合含 ";"，于是在第一个 "&amp;" 处截断
+    #      → 所有带查询参数的 URL 都变成坏链（实测 8/13）
+    #   ② URL 里的 * 先被强调解析吃掉 → 公众号 signature 参数自带 *，把 URL 切成 <em>
+    #   ③ 代码块内容（_keep）会被二次转义成 &amp;amp;
     s = re.sub(r"!?\[([^\]]*)\]\(([^)\s]+)\)",
-               lambda m: '<a class="u" href="%s">%s</a>' % (m.group(2), m.group(1) or m.group(2)), s)
+               lambda m: _link(m.group(2), m.group(1), stash), s)
+    s = AUTOLINK_RE.sub(lambda m: _link(m.group(1), "", stash), s)
+    s = html.escape(s, quote=False)
+    s = s.replace("\x03", "<br>")
     s = re.sub(r"~~([^~]+)~~", r"<del>\1</del>", s)
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", s)
     s = CITE_RE.sub(lambda m: '<a class="cite" href="#src-%s">%s</a>' % (m.group(1), m.group(1)), s)
-    s = AUTOLINK_RE.sub(lambda m: '<a class="u" href="%s">%s</a>' % (m.group(1), m.group(1)), s)
     return s
+
+
+def _link(url, text, stash):
+    """生成链接并暂存 —— 在此处自行转义，之后不再参与强调/链接解析。"""
+    stash.append('<a class="u" href="%s">%s</a>'
+                 % (html.escape(url, quote=True), html.escape(text or url, quote=False)))
+    return "\x00%d\x00" % (len(stash) - 1)
 
 
 def _keep(code, stash):
@@ -161,9 +172,12 @@ def convert(md, toc_levels=TOC_LEVELS):
                     tds.append("<%s%s>%s</%s>" % (tag, a, restore(inline(c, stash), stash), tag))
                 return "<tr>%s</tr>" % "".join(tds)
 
-            out.append('<div class="tw"><table><thead>' + row(head, "th") + "</thead><tbody>")
+            # tw = 横向滚动容器；fade = 右缘渐隐提示；scrollhint = 文字提示（仅在实际溢出时由 JS 显示）
+            out.append('<div class="twrap"><div class="tw"><table><thead>'
+                       + row(head, "th") + "</thead><tbody>")
             out += [row(b, "td") for b in body]
-            out.append("</tbody></table></div>")
+            out.append('</tbody></table></div><span class="fade" aria-hidden="true"></span>'
+                       '<div class="scrollhint">← 左右滑动查看 →</div></div>')
             continue
 
         m = HEAD_RE.match(line)
@@ -223,7 +237,10 @@ def convert(md, toc_levels=TOC_LEVELS):
         out.append("<p>%s</p>" % restore(inline(line, stash), stash))  # 段落
         i += 1
 
-    return "\n".join(out), toc
+    # 出口统一还原 —— 列表（_render_tree）内部从不调 restore，源码行/列表里的
+    # URL 和行内代码会以 \x00N\x00 占位符形态漏进输出（表现为「链接凭空消失」）。
+    # 在这里兜底，比在每个分支各还原一次可靠：append 进 out 的内容一律已还原。
+    return restore("\n".join(out), stash), toc
 
 
 # ---------------------------------------------------------------- 自检
@@ -239,9 +256,35 @@ def selfcheck(md, out_html):
     if uncited:
         warns.append("来源已列出但正文未引用（%d 条）→ %s" % (len(uncited), sorted(uncited)))
 
-    # 残留 markdown（剔除代码块/行内代码后再查）
-    stripped = re.sub(r"<pre><code>.*?</code></pre>", "", out_html, flags=re.S)
+    # 内部占位符泄漏（回归护栏）：
+    #   \x00N\x00 是 inline()/stash 的暂存占位符，正常应全部还原成 HTML。
+    #   漏一个就说明某条渲染分支忘了调 restore() —— 表现是「链接/代码凭空消失」，
+    #   而 href 计数看起来还很正常，极难靠肉眼发现。这条就是为此设的。
+    leaked = re.findall(r"\x00\d+\x00", out_html)
+    if leaked:
+        errors.append("内部占位符泄漏 %d 处（有分支没调 restore）→ %s"
+                      % (len(leaked), sorted(set(leaked))[:3]))
+
+    # 链接完整性（回归护栏）：
+    #   href 里混入 < > = URL 被强调/链接解析吃掉；以 & 或 &amp 结尾 = 在 & 处被截断
+    hrefs = re.findall(r'href="([^"]*)"', out_html)
+    broken = [h for h in hrefs if "<" in h or ">" in h]
+    if broken:
+        errors.append("链接被破坏：href 里混入了 HTML 标记 → %s" % broken[:3])
+    trunc = [h for h in hrefs if h.endswith("&amp") or h.endswith("&")]
+    if trunc:
+        errors.append("链接疑似被截断（以 & 结尾）→ %s" % trunc[:3])
+
+    # 残留 markdown（只在「会被渲染的文本」里查）
+    # 剔除顺序有讲究，四类都不是可见正文，误报全出在这里：
+    #   style/script —— CSS 注释里写个强调符号就会被当成残留（踩过）
+    #   pre>code、code —— 代码块/行内代码本就该原样保留
+    #   ="..." 属性值 —— URL 里带 * 或 # 是正常的
+    stripped = re.sub(r"<style\b.*?</style>", "", out_html, flags=re.S | re.I)
+    stripped = re.sub(r"<script\b.*?</script>", "", stripped, flags=re.S | re.I)
+    stripped = re.sub(r"<pre><code>.*?</code></pre>", "", stripped, flags=re.S)
     stripped = re.sub(r"<code>.*?</code>", "", stripped, flags=re.S)
+    stripped = re.sub(r'="[^"]*"', '=""', stripped)
     for pat, name in [(r"\*\*", "**"), (r"(?m)^#{1,6}\s", "#"), (r"\]\(", "](md链接"),
                       (r"(?m)^\|", "表格竖线"), (r"`", "反引号")]:
         if re.search(pat, stripped):
@@ -310,6 +353,19 @@ TEMPLATE = """<!DOCTYPE html>
   b.textContent='目录';b.className='tocbtn';
   b.onclick=function(){{nav.classList.toggle('open');}};
   nav.insertBefore(b,nav.firstChild);
+  // 表格横向溢出检测：只在真的能横滑时才显示提示，塞得下就一动不动
+  [].forEach.call(document.querySelectorAll('.twrap'),function(w){{
+    var tw=w.querySelector('.tw');
+    function upd(){{
+      var over=tw.scrollWidth>tw.clientWidth+2;
+      w.classList.toggle('scrollable',over);
+      w.classList.toggle('at-end',tw.scrollLeft+tw.clientWidth>=tw.scrollWidth-2);
+    }}
+    tw.addEventListener('scroll',upd,{{passive:true}});
+    window.addEventListener('resize',upd);
+    window.addEventListener('load',upd);
+    upd();
+  }});
 }})();
 </script>
 </body>

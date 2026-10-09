@@ -39,7 +39,8 @@
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--fg);
-  font:var(--size)/var(--lh) var(--font);-webkit-font-smoothing:antialiased}
+  font:var(--size)/var(--lh) var(--font);-webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%}
 .layout{display:flex;gap:36px;max-width:1500px;margin:0 auto;padding:0 28px}
 
 /* --------------------------------------------------------------- 目录 */
@@ -56,7 +57,10 @@ nav.toc a.lv3,.toc a.lv4,.toc a.lv5,.toc a.lv6{color:var(--muted);padding-left:2
   background:var(--card);color:var(--fg);border-radius:6px;cursor:pointer;font:inherit}
 
 /* --------------------------------------------------------------- 正文 */
-main{flex:1 1 auto;min-width:0;max-width:var(--maxw);padding:36px 0 120px}
+/* overflow-wrap 是承重的：正文里出现长 URL / 无空格的签名串时，
+   不换行会撑破容器 —— 实测曾让 1440px 桌面端横向溢出到 1938px。 */
+main{flex:1 1 auto;min-width:0;max-width:var(--maxw);padding:36px 0 120px;
+  overflow-wrap:break-word}
 h1{font-size:1.85em;line-height:1.35;margin:.2em 0 .6em;letter-spacing:-.01em}
 h2{font-size:1.42em;margin:2.2em 0 .7em;padding-bottom:.35em;border-bottom:2px solid var(--line)}
 h3{font-size:1.16em;margin:1.8em 0 .5em}
@@ -79,14 +83,28 @@ li{margin:.32em 0}
 li>ul,li>ol{margin:.25em 0}
 
 /* --------------------------------------------------------------- 表格 */
-.tw{overflow-x:auto;margin:1.1em 0;border:1px solid var(--line);border-radius:10px;
-  background:var(--card)}
+.twrap{position:relative}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:1.1em 0;
+  border:1px solid var(--line);border-radius:10px;background:var(--card)}
 table{border-collapse:collapse;width:100%;font-size:14.5px}
 th,td{padding:9px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;
-  line-height:1.6}
+  line-height:1.6;overflow-wrap:break-word}
 thead th{background:var(--thead);font-weight:600;white-space:nowrap;position:sticky;top:0}
 tbody tr:nth-child(even){background:var(--zebra)}
 tbody tr:last-child td{border-bottom:0}
+
+/* 横滑提示：只在表格确实溢出时才出现（JS 给 .twrap 打 .scrollable），
+   塞得下时完全不显示。滑到最右端时渐隐自动消失，提示「到底了」。
+   注：本文件被内联进 HTML，注释里别写双星号，会被自检当成残留 Markdown。 */
+.fade{display:none;position:absolute;top:1px;right:1px;height:calc(100% - 2px);width:44px;
+  pointer-events:none;border-radius:0 10px 10px 0;
+  background:linear-gradient(to left,var(--card) 20%,transparent);
+  transition:opacity .18s}
+.twrap.scrollable .fade{display:block}
+.twrap.at-end .fade{opacity:0}
+.scrollhint{display:none;margin:-.6em 0 1em;font-size:12.5px;color:var(--muted);
+  text-align:center;letter-spacing:.02em}
+.twrap.scrollable .scrollhint{display:block}
 
 /* --------------------------------------------------------------- 引用与链接 */
 a.cite{display:inline-block;font-size:.76em;font-weight:600;color:var(--cite);
@@ -106,17 +124,41 @@ li[id^="src-"]:target{background:var(--mark);border-radius:6px;
   a.cite{background:none;color:inherit}
   a.u{color:inherit;text-decoration:none}
   .tw{overflow:visible;border:0}
+  .fade,.scrollhint{display:none!important}
   thead th{position:static}
   h2,h3{page-break-after:avoid}
   table,pre,blockquote{page-break-inside:avoid}
 }
 
-/* --------------------------------------------------------------- 窄屏 */
+/* --------------------------------------------------------------- 平板 / 窄屏 */
 @media (max-width:900px){
+  :root{--size:15.5px}
   .layout{flex-direction:column;padding:0 18px}
   nav.toc{position:static;height:auto;flex:none;border-right:0;
-    border-bottom:1px solid var(--line);padding:18px 0}
+    border-bottom:1px solid var(--line);padding:16px 0}
   .tocbtn{display:block}
   nav.toc[data-collapsible]:not(.open) a{display:none}
+  nav.toc[data-collapsible]:not(.open) .ttl{display:none}
   main{padding:20px 0 80px}
+  h1{font-size:1.5em}
+  h2{font-size:1.26em}
+  table{font-size:13.5px}
+  th,td{padding:8px 10px}
+  pre{padding:13px 14px;font-size:.84em}
+  blockquote{padding:.55em .85em}
+}
+
+/* --------------------------------------------------------------- 手机 */
+@media (max-width:560px){
+  :root{--size:15px}
+  .layout{padding:0 14px}
+  h1{font-size:1.32em}
+  h2{margin-top:1.9em}
+  h3{font-size:1.08em}
+  table{font-size:13px}
+  th,td{padding:7px 9px}
+  ul,ol{padding-left:1.3em}
+  ul ul,ol ol,ul ol,ol ul{padding-left:1.1em}
+  main{padding:14px 0 64px}
+  .fade{width:34px}
 }
