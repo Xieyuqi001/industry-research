@@ -1,0 +1,122 @@
+/* ============================================================================
+   研报 HTML 主题 —— 唯一需要改样式的文件
+   改下面 :root 和深色块里的变量，就能换全局配色/字号。
+   改完直接重新跑 build.py 即可生效（输出会把本文件内联进去）。
+   ========================================================================== */
+
+:root{
+  /* —— 配色 —— */
+  --bg:#fbfbfa;          /* 页面底色 */
+  --fg:#1f2328;          /* 正文颜色 */
+  --muted:#6b7280;       /* 次要文字：目录三级、引用块 */
+  --line:#e5e7eb;        /* 分隔线 / 表格边框 */
+  --card:#ffffff;        /* 卡片底：代码块、引用块、表格 */
+  --accent:#1d4ed8;      /* 强调色：链接、当前章节标记 */
+  --cite:#0f766e;        /* 引用徽章文字色 */
+  --citebg:#ecfdf5;      /* 引用徽章底色 */
+  --thead:#f3f4f6;       /* 表头底色 */
+  --zebra:#fafafa;       /* 表格隔行底色 */
+  --mark:#fde68a;        /* 跳转到来源时的高亮色 */
+
+  /* —— 排版 —— */
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --size:16px;           /* 正文字号 */
+  --lh:1.75;             /* 正文行高 */
+  --toc-w:280px;         /* 左侧目录宽度 */
+  --maxw:960px;          /* 正文最大宽度 */
+}
+
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#16181d; --fg:#e6e6e6; --muted:#9aa1ab; --line:#2e3238; --card:#1d2026;
+    --accent:#7aa2f7; --cite:#5eead4; --citebg:#12312c; --thead:#24282f;
+    --zebra:#1a1d22; --mark:#fde68a;
+  }
+}
+
+/* --------------------------------------------------------------- 基础 */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:var(--size)/var(--lh) var(--font);-webkit-font-smoothing:antialiased}
+.layout{display:flex;gap:36px;max-width:1500px;margin:0 auto;padding:0 28px}
+
+/* --------------------------------------------------------------- 目录 */
+nav.toc{position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto;
+  flex:0 0 var(--toc-w);padding:28px 0;font-size:13.5px;border-right:1px solid var(--line)}
+nav.toc .ttl{font-weight:700;font-size:12px;letter-spacing:.08em;color:var(--muted);
+  text-transform:uppercase;margin:0 0 12px}
+nav.toc a{display:block;text-decoration:none;color:var(--fg);padding:5px 10px;border-radius:6px;
+  border-left:2px solid transparent;line-height:1.45}
+nav.toc a:hover{background:var(--thead)}
+nav.toc a.lv2{font-weight:600;margin-top:8px}
+nav.toc a.lv3,.toc a.lv4,.toc a.lv5,.toc a.lv6{color:var(--muted);padding-left:22px;font-size:13px}
+.tocbtn{display:none;margin:0 0 10px;padding:6px 12px;border:1px solid var(--line);
+  background:var(--card);color:var(--fg);border-radius:6px;cursor:pointer;font:inherit}
+
+/* --------------------------------------------------------------- 正文 */
+main{flex:1 1 auto;min-width:0;max-width:var(--maxw);padding:36px 0 120px}
+h1{font-size:1.85em;line-height:1.35;margin:.2em 0 .6em;letter-spacing:-.01em}
+h2{font-size:1.42em;margin:2.2em 0 .7em;padding-bottom:.35em;border-bottom:2px solid var(--line)}
+h3{font-size:1.16em;margin:1.8em 0 .5em}
+h4{font-size:1.02em;margin:1.4em 0 .4em}
+h5,h6{font-size:1em;margin:1.2em 0 .3em;color:var(--muted)}
+p{margin:.7em 0}
+hr{border:0;border-top:1px solid var(--line);margin:2.4em 0}
+strong{font-weight:700}
+del{opacity:.6}
+code{background:var(--thead);padding:.12em .38em;border-radius:4px;
+  font:.88em/1.5 var(--mono)}
+pre{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+  overflow-x:auto;line-height:1.55}
+pre code{background:none;padding:0;font-size:.86em;white-space:pre}
+blockquote{margin:1em 0;padding:.6em 1em;border-left:3px solid var(--accent);
+  background:var(--card);border-radius:0 8px 8px 0;color:var(--muted)}
+blockquote blockquote{margin:.5em 0;border-left-color:var(--line)}
+ul,ol{padding-left:1.5em;margin:.6em 0}
+li{margin:.32em 0}
+li>ul,li>ol{margin:.25em 0}
+
+/* --------------------------------------------------------------- 表格 */
+.tw{overflow-x:auto;margin:1.1em 0;border:1px solid var(--line);border-radius:10px;
+  background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{padding:9px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;
+  line-height:1.6}
+thead th{background:var(--thead);font-weight:600;white-space:nowrap;position:sticky;top:0}
+tbody tr:nth-child(even){background:var(--zebra)}
+tbody tr:last-child td{border-bottom:0}
+
+/* --------------------------------------------------------------- 引用与链接 */
+a.cite{display:inline-block;font-size:.76em;font-weight:600;color:var(--cite);
+  background:var(--citebg);padding:.05em .38em;border-radius:5px;text-decoration:none;
+  margin:0 .06em;vertical-align:.08em}
+a.cite:hover{outline:2px solid var(--cite)}
+a.u{color:var(--accent);word-break:break-all;text-decoration:none}
+a.u:hover{text-decoration:underline}
+li[id^="src-"]:target{background:var(--mark);border-radius:6px;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--mark) 45%,transparent)}
+
+/* --------------------------------------------------------------- 打印 */
+@media print{
+  nav.toc{display:none}
+  .layout{display:block;padding:0}
+  main{max-width:none;padding:0}
+  a.cite{background:none;color:inherit}
+  a.u{color:inherit;text-decoration:none}
+  .tw{overflow:visible;border:0}
+  thead th{position:static}
+  h2,h3{page-break-after:avoid}
+  table,pre,blockquote{page-break-inside:avoid}
+}
+
+/* --------------------------------------------------------------- 窄屏 */
+@media (max-width:900px){
+  .layout{flex-direction:column;padding:0 18px}
+  nav.toc{position:static;height:auto;flex:none;border-right:0;
+    border-bottom:1px solid var(--line);padding:18px 0}
+  .tocbtn{display:block}
+  nav.toc[data-collapsible]:not(.open) a{display:none}
+  main{padding:20px 0 80px}
+}

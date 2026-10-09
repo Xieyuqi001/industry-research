@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 个人产出：默认不进仓库。
+# 想把某篇报告公开，把它放进 examples/（那个目录是会被跟踪的）。
+reports/
+
+# 编辑器 / IDE
+.idea/
+.vscode/
+*.swp
+
+# 本地配置——绝不要提交任何含密钥的文件
+settings.json
+settings.local.json
+.env
+.env.*
+!.env.example
